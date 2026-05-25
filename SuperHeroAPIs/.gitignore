@@ -7,6 +7,9 @@ obj/
 *.suo
 .vs/
 
+/env
+.env
+
 ## Rider IDE
 .idea/
 
@@ -34,3 +37,4 @@ appsettings.*.json
 ## OS files
 .DS_Store
 Thumbs.db
+.env
