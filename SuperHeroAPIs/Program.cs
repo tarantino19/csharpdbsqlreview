@@ -6,7 +6,8 @@ using SuperHeroAPIs.Data;
 using SuperHeroAPIs.Repositories;
 using SuperHeroAPIs.Services;
 
-Env.Load();
+if (File.Exists(".env"))
+    Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
