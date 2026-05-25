@@ -219,3 +219,88 @@ ere's the complete setup guide based on exactly what you did:
   ---
   That's it. Your database and tables will be created in PostgreSQL
   automatically after step 8.
+
+  -----
+
+
+  
+---
+AUTHENTICATION & AUTHORIZATION LESSONS
+---
+
+## 8. Authentication vs Authorization
+
+Authentication  — WHO are you?      (happens at login — verify identity, issue token)
+Authorization   — WHAT can you do?  (happens every request — check if token allows access)
+
+Analogy: Authentication is showing your ID at the door.
+         Authorization is whether your ID lets you into the VIP section.
+
+In ASP.NET:
+    app.UseAuthentication()  → reads the JWT, populates User claims ("I know who you are")
+    app.UseAuthorization()   → checks [Authorize] attributes ("I know what you can do")
+
+---
+
+## 9. JWT Auth Flow (the standard pattern)
+
+    POST /auth/register  →  hash password, save user to DB
+    POST /auth/login     →  check password → generate JWT → return token to client
+    POST /auth/logout    →  invalidate refresh token in DB (for stateless JWT, client just discards it)
+
+Once the client has the token, it sends it on every request:
+    Authorization: Bearer <token>
+
+ASP.NET middleware validates it automatically — you never write that validation logic yourself.
+
+---
+
+## 10. Protected Routes — [Authorize] and [AllowAnonymous]
+
+These are C# attributes from built-in ASP.NET namespaces:
+
+    using Microsoft.AspNetCore.Mvc;           // [ApiController], [Route]
+    using Microsoft.AspNetCore.Authorization; // [Authorize], [AllowAnonymous]
+
+No extra NuGet packages needed. Usage:
+
+    [Authorize]               // entire controller is protected
+    public class HeroesController : ControllerBase
+    {
+        [AllowAnonymous]      // override — this one endpoint is public
+        public IActionResult PublicEndpoint() { ... }
+
+        [Authorize(Roles = "Admin")]  // role-based access
+        public IActionResult AdminOnly() { ... }
+    }
+
+If JWT is missing/invalid/expired → 401 Unauthorized returned automatically.
+Your action method never even runs.
+
+---
+
+## 11. Why You Still Build AuthController + AuthService
+
+ASP.NET provides the *checking* mechanism — not the user data or token generation.
+
+    ASP.NET gives you (free):
+    - Middleware that validates JWT on incoming requests
+    - [Authorize] attribute that blocks unauthorized requests
+    - UserManager / SignInManager for password hashing
+
+    ASP.NET does NOT do for you:
+    - Know your users (your DB, your schema)
+    - Generate a JWT and return it to the client
+    - Define your login/register HTTP endpoints
+
+    So you build:
+    - AuthController  → your login/register/logout HTTP endpoints
+    - AuthService     → generates JWT, validates credentials, talks to DB
+
+    ASP.NET handles enforcement. You handle issuance.
+
+Follow the same layered pattern as the rest of the app:
+    AuthController → IAuthService → AuthService → (UserManager / DB)
+
+Register in Program.cs like any other service:
+    builder.Services.AddScoped<IAuthService, AuthService>();
