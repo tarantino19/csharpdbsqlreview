@@ -1,0 +1,36 @@
+## Build output
+bin/
+obj/
+
+## User-specific Visual Studio files
+*.user
+*.suo
+.vs/
+
+## Rider IDE
+.idea/
+
+## VS Code
+.vscode/
+
+## NuGet packages (restored automatically)
+*.nupkg
+packages/
+.nuget/
+
+## Publish output
+publish/
+out/
+
+## Logs
+*.log
+logs/
+
+## Environment/secrets — never commit these
+appsettings.*.json
+!appsettings.json
+!appsettings.Development.json
+
+## OS files
+.DS_Store
+Thumbs.db
