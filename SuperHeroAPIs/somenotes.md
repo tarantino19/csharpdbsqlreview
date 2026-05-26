@@ -304,3 +304,272 @@ Follow the same layered pattern as the rest of the app:
 
 Register in Program.cs like any other service:
     builder.Services.AddScoped<IAuthService, AuthService>();
+
+---
+
+
+ JWT Auth Flow
+
+  Signup — happens once
+
+  Client sends:  { email, password }
+  Server:
+    1. Checks email doesn't already exist
+    2. Hashes the password (bcrypt via ASP.NET Identity)
+    3. Saves user to DB
+    4. Returns 200 OK (or auto-logs them in by returning a
+  token)
+
+  Login — gets the token
+
+  Client sends:  { email, password }
+  Server:
+    1. Finds user by email in DB
+    2. Compares the hashed password
+    3. If match → generates a JWT token (signed with a secret
+   key)
+    4. Returns the token to the client
+
+  Client:
+    - Stores the token (localStorage, cookie, memory)
+
+  Every protected request after login
+
+  Client sends:  GET /api/heroes
+                 Authorization: Bearer eyJhbGci...
+
+  Server (middleware, automatic):
+    1. Reads the Bearer token from the header
+    2. Validates the signature (was it signed with our secret
+   key?)
+    3. Checks expiry (is it still valid?)
+    4. If all good → request proceeds, User claims are
+  populated
+    5. If bad/expired → 401 Unauthorized, your controller
+  never runs
+
+  Logout
+
+  JWT is stateless — the server stores nothing.
+
+  Option A (simple):
+    Client just deletes the token. Done.
+    Downside: if someone stole the token, it still works
+  until it expires.
+
+  Option B (refresh tokens, more common):
+    Issue 2 tokens at login:
+      - Access token  → short-lived (15 min), used on every
+  request
+      - Refresh token → long-lived (7 days), stored in DB
+
+    Logout = delete the refresh token from DB.
+    Now they can't get a new access token, so they're
+  effectively logged out within 15 min.
+
+  ---
+  Why JWT is "stateless"
+  
+  A traditional session stores login state on the server
+  (session ID in a table).
+
+  JWT stores it inside the token itself — the server just
+  validates the signature math. No DB lookup needed on every
+  request. That's why it scales well.
+
+  Token contains (readable by anyone):  { userId, email,
+  role, expiry }
+  Token is signed with your secret key  →  only YOUR server
+  can verify it's real
+
+
+  ---
+
+
+  Here's exactly what ASP.NET does automatically for each:
+
+  ---
+  [Authorize] — what ASP.NET does automatically
+
+  Incoming request hits a protected route
+      ↓
+  Middleware checks Authorization: Bearer <token> header
+      ↓
+  Is token present?        No  → 401 Unauthorized (your code
+  never runs)
+  Is signature valid?      No  → 401 Unauthorized (your code
+  never runs)
+  Is token expired?        Yes → 401 Unauthorized (your code
+  never runs)
+  All checks pass?         Yes → populates User claims, your
+  action method runs
+
+  You write zero validation logic. The middleware does all of
+   it.
+
+  ---
+  [AllowAnonymous] — what ASP.NET does automatically
+
+  Incoming request hits an anonymous route
+      ↓
+  Middleware skips ALL token checking entirely
+      ↓
+  Your action method runs immediately, no questions asked
+
+  Even if you put [Authorize] on the whole controller,
+  [AllowAnonymous] on a specific method overrides it —
+  ASP.NET sees it and skips the check just for that endpoint.
+
+  ---
+  Side by side
+
+  ┌──────────────────┬─────────────┬─────────────────────┐
+  │     Scenario     │   Token     │  What ASP.NET does  │
+  │                  │  present?   │                     │
+  ├──────────────────┼─────────────┼─────────────────────┤
+  │ [Authorize]      │ Yes, valid  │ Runs your method    │
+  ├──────────────────┼─────────────┼─────────────────────┤
+  │ [Authorize]      │ Yes,        │ 401, your method    │
+  │                  │ expired     │ blocked             │
+  ├──────────────────┼─────────────┼─────────────────────┤
+  │ [Authorize]      │ Missing     │ 401, your method    │
+  │                  │             │ blocked             │
+  ├──────────────────┼─────────────┼─────────────────────┤
+  │ [AllowAnonymous] │ Anything    │ Runs your method,   │
+  │                  │             │ no check            │
+  └──────────────────┴─────────────┴─────────────────────┘
+
+  ---
+  The key point: you never write if (token == null) return 
+  401. ASP.NET's middleware pipeline handles all of that
+  before your controller even loads.
+
+
+  ---
+
+  overall
+
+  HTTP Request
+       ↓
+  ┌─────────────────────────────────────────────────────┐
+  │ CONTROLLER (AuthController, SuperHeroController)    │
+  │ - Receives HTTP requests                            │
+  │ - Works with DTOs (the shape of incoming/outgoing   │
+  │   data)                                             │
+  │ - Calls Service via interface (IAuthService)        │
+  │ - Returns HTTP responses (Ok, NotFound, etc.)       │
+  └─────────────────────────────────────────────────────┘
+       ↓ uses IAuthService (the mask)
+  ┌─────────────────────────────────────────────────────┐
+  │ SERVICE (AuthService, SuperHeroService)             │
+  │ - Business logic lives here                         │
+  │ - Maps DTOs → Entities (going in)                   │
+  │ - Maps Entities → DTOs (going out)                  │
+  │ - Calls Repository via interface (IAuthRepository)  │
+  └─────────────────────────────────────────────────────┘
+       ↓ uses IAuthRepository (the mask)
+  ┌─────────────────────────────────────────────────────┐
+  │ REPOSITORY (AuthRepository, SuperHeroRepository)    │
+  │ - Only job: talk to the database                    │
+  │ - No business logic                                 │
+  │ - Works with Entities (raw DB models)               │
+  │ - Uses DataContext directly                         │
+  └─────────────────────────────────────────────────────┘
+       ↓
+  ┌─────────────────────────────────────────────────────┐
+  │ DATA (DataContext) + ENTITIES (SuperHero, User)     │
+  │ - DataContext = EF Core bridge to PostgreSQL        │
+  │ - Entities = C# classes that mirror DB tables       │
+  └─────────────────────────────────────────────────────┘
+       ↓
+    PostgreSQL
+
+  ---
+  Supporting pieces:
+
+  ┌──────────────────────────┬─────────────────────────────────────────────┐
+  │           Part           │                    Role                     │
+  ├──────────────────────────┼─────────────────────────────────────────────┤
+  │                          │ The data shape the outside world sees —     │
+  │ DTOs                     │ what comes in from requests and goes out in │
+  │                          │  responses                                  │
+  ├──────────────────────────┼─────────────────────────────────────────────┤
+  │ Interfaces               │ The "mask" — each layer only knows the      │
+  │ (IAuthService,           │ contract of the layer below, not the real   │
+  │ IAuthRepository)         │ class                                       │
+  ├──────────────────────────┼─────────────────────────────────────────────┤
+  │                          │ Wires everything together — registers which │
+  │ Program.cs               │  real class goes behind each mask,          │
+  │                          │ configures JWT, DB connection               │
+  ├──────────────────────────┼─────────────────────────────────────────────┤
+  │ Validators               │ Automatically checks DTOs before they even  │
+  │                          │ reach the controller                        │
+  ├──────────────────────────┼─────────────────────────────────────────────┤
+  │ Migrations               │ Tracks changes to your DB schema over time  │
+  └──────────────────────────┴─────────────────────────────────────────────┘
+
+  ---
+  One request traced end-to-end (Login):
+
+  POST /api/auth/login
+    → AuthController.Login()        receives LoginDto
+    → IAuthService.LoginAsync()     validates credentials
+    → IAuthRepository.GetByEmail()  fetches User entity from DB
+    → BCrypt verifies password
+    → JWT token generated
+    → token set as cookie
+    → 200 OK returned
+
+  Each layer only knows about the one directly below it — that's what keeps the
+   code clean and swappable.
+
+
+---
+
+❯ wait so i wont see the Valifators in th controller                           
+
+⏺ Correct — you will never see the validators called in the controller. They're
+   invisible at that layer.
+
+  The flow is:
+
+  HTTP Request
+       ↓
+  Validator runs automatically   ← you never see this in the controller
+       ↓ (if invalid, request is rejected here, controller never runs)
+  Controller method executes
+
+  The magic is these two lines in Program.cs:49-50:
+
+  builder.Services.AddFluentValidationAutoValidation();
+  builder.Services.AddValidatorsFromAssemblyScanning<Program>();
+
+  AutoValidation tells ASP.NET to intercept every request, find the matching
+  validator for the DTO, run it, and reject the request automatically if it
+  fails — before your controller code ever touches it.
+
+  So the controller just trusts that by the time it receives a RegisterDto,
+  it's already valid. Clean separation — the controller doesn't need to care
+  about validation rules at all.
+
+   ---
+steps
+
+    - Program.cs — foundation, wires everything together (DI registration, JWT
+  config, DB connection)
+  - Entities — shape of data as the database sees it
+  - DTOs — shape of data as the outside world sees it, different per
+  route/operation
+  - Validators — guards on DTOs, auto-run before controllers
+  - DataContext — EF Core bridge to PostgreSQL
+  - Repositories — actual DB queries, use Entities + DataContext, hidden behind
+   interfaces
+  - Interfaces — the masks, each layer only sees the contract below it
+  - Services — business logic, maps between DTOs and Entities, hidden behind
+  interfaces
+  - Controllers — receive HTTP requests, use DTOs for shape, call Services,
+  handle auth ([Authorize], [AllowAnonymous])
+
+  You've got it. The only thing worth repeating is the direction: Controller →
+  Service → Repository → DataContext. Data flows up, dependencies only point
+  down.

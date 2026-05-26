@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using SuperHeroAPIs.Data;
 using SuperHeroAPIs.Entities;
 
+//repositories work with Entities not DTO - for db operations
 namespace SuperHeroAPIs.Repositories
 {
     public class SuperHeroRepository : ISuperHeroRepository

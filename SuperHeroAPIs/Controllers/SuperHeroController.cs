@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SuperHeroAPIs.DTOs;
 using SuperHeroAPIs.Services;
 
 namespace SuperHeroAPIs.Controllers
 {
+    [Authorize]
     [Route("api/[controller]")]
     [ApiController]
     public class SuperHeroController : ControllerBase
