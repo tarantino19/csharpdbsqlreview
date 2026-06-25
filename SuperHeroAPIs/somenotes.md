@@ -604,6 +604,7 @@ DTO = Request/Response shape
     Defines what data a specific API endpoint accepts or returns
     Similar to TypeScript interfaces/types for API requests and responses
     Lets you expose only the fields you want instead of returning the entire Entity
+    We dont call DTO, we use it as data return type in the controller
 
 A simple flow:
 
