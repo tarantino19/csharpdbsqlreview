@@ -573,3 +573,66 @@ steps
   You've got it. The only thing worth repeating is the direction: Controller →
   Service → Repository → DataContext. Data flows up, dependencies only point
   down.
+
+  --- js context ---
+
+  Based on how you're mapping it to MERN:
+
+Based on how you're mapping it to MERN:
+
+Controller = Express route handler
+    Handles HTTP requests/responses
+    Defines routes/endpoints
+    Calls services
+
+Service = Business logic layer
+    Contains the actual application rules
+    Coordinates repositories and other services
+    Keeps controllers thin
+
+Repository = Database access layer
+    Talks to EF Core/DbContext
+    Performs queries, inserts, updates, deletes
+    Similar to where you'd put Mongoose calls like User.findById() or User.create()
+
+Entity = Database model/schema
+    Represents how data is stored in the database
+    Similar to a Mongoose Model/Schema
+    Usually maps directly to a table
+
+DTO = Request/Response shape
+    Defines what data a specific API endpoint accepts or returns
+    Similar to TypeScript interfaces/types for API requests and responses
+    Lets you expose only the fields you want instead of returning the entire Entity
+
+A simple flow:
+
+Client
+  ↓
+Controller
+  ↓
+Service
+  ↓
+Repository
+  ↓
+Entity (Database Model)
+  ↓
+Database
+
+Database
+  ↑
+Entity
+  ↑
+Repository
+  ↑
+Service (maps Entity → DTO)
+  ↑
+Controller
+  ↑
+DTO (API Response)
+  ↑
+Client
+
+Interview version:
+
+"Entities represent the database structure, while DTOs represent the shape of data that a specific API endpoint accepts or returns. Controllers handle requests, Services contain business logic, and Repositories handle database operations."
