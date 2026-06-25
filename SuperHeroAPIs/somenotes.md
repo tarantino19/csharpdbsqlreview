@@ -637,3 +637,36 @@ Client
 Interview version:
 
 "Entities represent the database structure, while DTOs represent the shape of data that a specific API endpoint accepts or returns. Controllers handle requests, Services contain business logic, and Repositories handle database operations."
+
+
+--
+
+
+how context related to entities and repository
+
+repository uses the context, which then has access to ORM functions
+
+You can think of it as:
+
+Entity - context will get entity
+   ↓
+DataContext - and then repository will use context & entity
+   ↓
+Repository
+
+Where:
+
+Entity = defines the data structure
+DataContext = exposes EF Core ORM capabilities for those entities
+Repository = uses the DataContext to perform CRUD operations
+
+-----
+Entity
+   ↓ registered in
+DataContext
+   ↓ used by
+Repository (which also still uses Entity as data type)
+   ↓ called by
+Service
+   ↓ called by
+Controller
